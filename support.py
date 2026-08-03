@@ -1,10 +1,17 @@
 from io import BytesIO
 
-import openpyxl
 import pandas as pd
+
+try:
+    import openpyxl
+except ModuleNotFoundError:
+    openpyxl = None
 
 
 def load_excel_preview(uploaded_file) -> dict:
+    if openpyxl is None:
+        raise RuntimeError("Missing dependency 'openpyxl'. Add it to requirements.txt and redeploy.")
+
     workbook = openpyxl.load_workbook(BytesIO(uploaded_file.getvalue()), data_only=True)
     sheet_names = workbook.sheetnames
     first_sheet = workbook[sheet_names[0]]
