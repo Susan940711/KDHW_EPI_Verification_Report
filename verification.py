@@ -5,8 +5,12 @@ from datetime import date, datetime
 from io import BytesIO
 from typing import Any
 
-import openpyxl
 import pandas as pd
+
+try:
+    import openpyxl
+except ModuleNotFoundError:
+    openpyxl = None
 
 
 CODE_HEADER = "children_code"
@@ -134,6 +138,9 @@ def resolve_age_months_from_source_row(row: dict[str, Any]) -> int | None:
 
 
 def load_excel_rows(uploaded_file) -> list[dict[str, Any]]:
+    if openpyxl is None:
+        raise RuntimeError("Missing dependency 'openpyxl'. Add it to requirements.txt and redeploy.")
+
     workbook = openpyxl.load_workbook(BytesIO(uploaded_file.getvalue()), data_only=True)
     sheet = workbook.active
     rows = list(sheet.iter_rows(values_only=True))
