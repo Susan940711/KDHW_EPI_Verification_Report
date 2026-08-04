@@ -463,7 +463,22 @@ def calculate_completed_reporting_month(
 
     if 12 <= age_months <= 59:
         completion_anchor_doses = ["OPV3", "Penta3", "MMR1"]
-        if any(normalize_code(source_values.get(dose)).casefold() == "other" for dose in completion_anchor_doses):
+        kdhw_anchor_dates: list[date] = []
+        anchor_received = False
+        for dose in completion_anchor_doses:
+            dose_source = normalize_code(source_values.get(dose))
+            if not has_received(dose_source):
+                continue
+            anchor_received = True
+            if dose_source.casefold() == "kdhw":
+                anchor_date = reporting_values.get(dose) or date_values.get(dose)
+                if anchor_date is not None:
+                    kdhw_anchor_dates.append(anchor_date)
+
+        if kdhw_anchor_dates:
+            return max(kdhw_anchor_dates)
+
+        if anchor_received and any(normalize_code(source_values.get(dose)).casefold() == "other" for dose in completion_anchor_doses):
             mmr2_completion_date = reporting_values.get("MMR2") or date_values.get("MMR2")
             if has_received(source_values.get("MMR2")) and mmr2_completion_date is not None:
                 return mmr2_completion_date
