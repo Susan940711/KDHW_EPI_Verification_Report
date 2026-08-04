@@ -464,15 +464,33 @@ def calculate_completed_reporting_month(
     required_entries: list[tuple[date, str]] = []
     for dose_key in required_doses:
         dose_source = source_values.get(dose_key, "Not received yet")
-        dose_reporting_month = reporting_values.get(dose_key)
-        if dose_reporting_month is not None and has_received(dose_source):
+        if not has_received(dose_source):
+            continue
+
+        # For doses received as "Other", reporting_month is often blank.
+        # Fall back to the dose date so completion quarter can still be derived.
+        dose_reporting_month = reporting_values.get(dose_key) or date_values.get(dose_key)
+        if dose_reporting_month is not None:
             required_entries.append((dose_reporting_month, dose_source))
 
-    if not required_entries:
-        return None
+    if required_entries:
+        latest_required_date, _ = max(required_entries, key=lambda item: item[0])
+        return latest_required_date
 
-    latest_required_date, _ = max(required_entries, key=lambda item: item[0])
-    return latest_required_date
+    # Final fallback: if all required doses are received but all required dates
+    # are blank, use the latest available date from any received dose (e.g. MMR2).
+    fallback_dates: list[date] = []
+    for dose_key, dose_source in source_values.items():
+        if not has_received(dose_source):
+            continue
+        candidate = reporting_values.get(dose_key) or date_values.get(dose_key)
+        if candidate is not None:
+            fallback_dates.append(candidate)
+
+    if fallback_dates:
+        return max(fallback_dates)
+
+    return None
 
 
 def calculate_completed_dose(
