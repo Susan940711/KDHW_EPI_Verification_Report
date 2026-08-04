@@ -461,6 +461,24 @@ def calculate_completed_reporting_month(
     if any(source_values.get(dose, "Not received yet") == "Not received yet" for dose in required_doses):
         return None
 
+    if 12 <= age_months <= 59:
+        completion_anchor_doses = ["OPV3", "Penta3", "MMR1"]
+        if any(normalize_code(source_values.get(dose)).casefold() == "other" for dose in completion_anchor_doses):
+            mmr2_completion_date = reporting_values.get("MMR2") or date_values.get("MMR2")
+            if has_received(source_values.get("MMR2")) and mmr2_completion_date is not None:
+                return mmr2_completion_date
+
+        anchor_dates: list[date] = []
+        for dose in completion_anchor_doses:
+            if not has_received(source_values.get(dose)):
+                continue
+            anchor_date = reporting_values.get(dose) or date_values.get(dose)
+            if anchor_date is not None:
+                anchor_dates.append(anchor_date)
+
+        if anchor_dates:
+            return max(anchor_dates)
+
     required_entries: list[tuple[date, str]] = []
     for dose_key in required_doses:
         dose_source = source_values.get(dose_key, "Not received yet")
