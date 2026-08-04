@@ -1351,11 +1351,14 @@ def build_pw_verification_sheet(output: Workbook, pw_sheet) -> dict[str, int]:
         raise KeyError(f"Column '{PW_CODE_HEADER}' was not found in sheet '{PW_SHEET}'.")
 
     mother_code_column = headers.index(PW_CODE_HEADER) + 1
-    rows = list(pw_sheet.iter_rows(min_row=2, values_only=True))
+    row_count = 0
+    code_counts: Counter[str] = Counter()
+    for row in pw_sheet.iter_rows(min_row=2, values_only=True):
+        row_count += 1
+        mother_code = normalize_code(row[mother_code_column - 1])
+        if mother_code:
+            code_counts[mother_code] += 1
 
-    normalized_codes = [normalize_code(row[mother_code_column - 1]) for row in rows]
-    non_empty_codes = [code for code in normalized_codes if code]
-    code_counts = Counter(non_empty_codes)
     duplicate_codes = {code for code, count in code_counts.items() if count > 1}
 
     report = output.create_sheet(title=PW_VERIFICATION_SHEET)
@@ -1399,7 +1402,7 @@ def build_pw_verification_sheet(output: Workbook, pw_sheet) -> dict[str, int]:
 
     rule_by_other_header = {rule[1]: rule for rule in present_source_rules}
 
-    for row_index, row in enumerate(rows, start=2):
+    for row_index, row in enumerate(pw_sheet.iter_rows(min_row=2, values_only=True), start=2):
         row_values = list(row)
         mother_code = normalize_code(row_values[mother_code_column - 1])
         status = "OK"
@@ -1470,7 +1473,7 @@ def build_pw_verification_sheet(output: Workbook, pw_sheet) -> dict[str, int]:
             code_cell.font = RED_FONT
 
     summary = {
-        "rows": len(rows),
+        "rows": row_count,
         "missing_rows": missing_row_count,
         "duplicate_rows": duplicate_row_count,
         "duplicate_codes": len(duplicate_codes),
@@ -1491,10 +1494,14 @@ def build_verification_report(source_sheet) -> tuple[Workbook, dict[str, int]]:
     dob_column = headers.index("date_of_birth") + 1
     registered_column = headers.index("registered_date") + 1 if "registered_date" in headers else None
     comparison_columns = [headers.index(name) + 1 for name in DATE_COLUMNS if name in headers and name != "registered_date"]
-    rows = list(source_sheet.iter_rows(min_row=2, values_only=True))
-    normalized_codes = [normalize_code(row[code_column - 1]) for row in rows]
-    non_empty_codes = [code for code in normalized_codes if code]
-    code_counts = Counter(non_empty_codes)
+    row_count = 0
+    code_counts: Counter[str] = Counter()
+    for row in source_sheet.iter_rows(min_row=2, values_only=True):
+        row_count += 1
+        children_code = normalize_code(row[code_column - 1])
+        if children_code:
+            code_counts[children_code] += 1
+
     duplicate_codes = {code for code, count in code_counts.items() if count > 1}
 
     output = Workbook()
@@ -1529,7 +1536,7 @@ def build_verification_report(source_sheet) -> tuple[Workbook, dict[str, int]]:
     unlogical_row_count = 0
     affected_row_count = 0
 
-    for row_index, row in enumerate(rows, start=2):
+    for row_index, row in enumerate(source_sheet.iter_rows(min_row=2, values_only=True), start=2):
         row_values = list(row)
         code_value = normalize_code(row_values[code_column - 1])
         dob_value = normalize_date(row_values[dob_column - 1])
@@ -1645,7 +1652,7 @@ def build_verification_report(source_sheet) -> tuple[Workbook, dict[str, int]]:
 
     duplicate_code_count = len(duplicate_codes)
     summary = {
-        "rows": len(rows),
+        "rows": row_count,
         "missing_rows": missing_count,
         "duplicate_rows": duplicate_row_count,
         "duplicate_codes": duplicate_code_count,
