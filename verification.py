@@ -1812,6 +1812,8 @@ def main() -> None:
     if uploaded_size_mb is not None:
         st.caption(f"Uploaded file size: {uploaded_size_mb / (1024 * 1024):.2f} MB")
 
+    source_workbook = None
+
     try:
         set_stage("Loading workbook...")
         source_workbook, source_path = load_source_workbook(uploaded_file)
@@ -1821,6 +1823,8 @@ def main() -> None:
         set_stage("Collecting Year/Period filter options...")
         available_years, available_periods = collect_year_period_options(source_sheet, pw_sheet)
     except Exception as exc:
+        if source_workbook is not None:
+            source_workbook.close()
         stage.empty()
         error_code = classify_app_error(exc, current_stage)
         st.error(f"[{error_code}] Failed while {current_stage.lower()}: {exc}")
@@ -1866,9 +1870,9 @@ def main() -> None:
         build_cummu_indicator_sheet(report_workbook, source_workbook)
         build_td_alod_sheet(report_workbook, source_workbook)
         build_td2_indicator_sheet(report_workbook, source_workbook)
-        set_stage("Applying selected filters across all sheets...")
-        filtered_workbook = build_filtered_verification_workbook(report_workbook, selected_year_option, selected_period_option)
     except Exception as exc:
+        if source_workbook is not None:
+            source_workbook.close()
         stage.empty()
         error_code = classify_app_error(exc, current_stage)
         st.error(f"[{error_code}] Failed while {current_stage.lower()}: {exc}")
@@ -1876,6 +1880,9 @@ def main() -> None:
             st.write(f"Error code: {error_code}")
             st.code(traceback.format_exc())
         return
+    finally:
+        if source_workbook is not None:
+            source_workbook.close()
 
     stage.success("Workbook checks finished. Preparing the download file...")
 
@@ -1901,22 +1908,38 @@ def main() -> None:
     st.metric("PW rows with unlogical Td records", pw_summary["unlogical_rows"])
     st.info(f"PW rows with issues: {pw_summary['affected_rows']}")
 
+    include_full_download = st.checkbox(
+        "Also prepare full verification download (uses more memory)",
+        value=False,
+    )
+
     try:
         with st.spinner("Preparing the clean verification workbook for download..."):
             filtered_report_bytes = None
             report_bytes = None
+            is_unfiltered_selection = selected_year_option == "All" and selected_period_option == "All"
 
             try:
-                filtered_report_bytes = workbook_to_bytes(filtered_workbook)
+                if is_unfiltered_selection:
+                    filtered_report_bytes = workbook_to_bytes(report_workbook)
+                else:
+                    filtered_workbook = build_filtered_verification_workbook(report_workbook, selected_year_option, selected_period_option)
+                    try:
+                        filtered_report_bytes = workbook_to_bytes(filtered_workbook)
+                    finally:
+                        del filtered_workbook
+                        gc.collect()
             finally:
-                del filtered_workbook
-                gc.collect()
+                pass
 
-            try:
-                report_bytes = workbook_to_bytes(report_workbook)
-            finally:
-                del report_workbook
-                gc.collect()
+            if include_full_download:
+                if is_unfiltered_selection:
+                    report_bytes = filtered_report_bytes
+                else:
+                    report_bytes = workbook_to_bytes(report_workbook)
+
+            del report_workbook
+            gc.collect()
     except Exception as exc:
         error_code = classify_app_error(exc, "Preparing download")
         st.error(f"[{error_code}] The workbook was checked successfully, but the download file could not be prepared: {exc}")
