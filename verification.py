@@ -168,6 +168,7 @@ ALOD_ELIGIBLE_DOSES = {
     "MMR1",
     "MMR2",
     "JE1",
+    "JE2",
     "Rota1",
     "Rota2",
 }
@@ -243,9 +244,12 @@ DISAGGREGATE_HEADERS = [
     "MMR2_U1",
     "MMR2_U5",
     "MMR2_>5",
-    "JE_U1",
-    "JE_U5",
-    "JE_>5",
+    "JE1_U1",
+    "JE1_U5",
+    "JE1_>5",
+    "JE2_U1",
+    "JE2_U5",
+    "JE2_>5",
     "IPV_U1",
     "IPV_U5",
     "IPV_>5",
@@ -688,10 +692,8 @@ def resolve_age_months_from_source_row(headers: list[object], row_values: list[o
 
 
 def dose_group_key(vaccine_dose: str) -> str | None:
-    if vaccine_dose in {"BCG", "OPV1", "OPV2", "OPV3", "Penta1", "Penta2", "Penta3", "MMR1", "MMR2", "IPV"}:
+    if vaccine_dose in {"BCG", "OPV1", "OPV2", "OPV3", "Penta1", "Penta2", "Penta3", "MMR1", "MMR2", "JE1", "JE2", "IPV"}:
         return vaccine_dose
-    if vaccine_dose in {"JE1", "JE2"}:
-        return "JE"
     return None
 
 
